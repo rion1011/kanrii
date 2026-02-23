@@ -26,12 +26,14 @@ class ItemNotifier extends StateNotifier<List<Item>> {
       createdAt: DateTime.now(),
     );
     await _repo.save(item);
-    _load();
+    // キャッシュから直接追加（再読み込み不要）
+    state = [...state, item];
   }
 
   Future<void> delete(String id) async {
     await _repo.delete(id);
-    _load();
+    // キャッシュから直接削除（再読み込み不要）
+    state = state.where((i) => i.id != id).toList();
   }
 
   Future<void> reorder(int oldIndex, int newIndex) async {
@@ -41,9 +43,10 @@ class ItemNotifier extends StateNotifier<List<Item>> {
     list.insert(newIndex, item);
     for (var i = 0; i < list.length; i++) {
       list[i].sortOrder = i;
-      await _repo.save(list[i]);
     }
+    // 先にUIを更新してから一括保存（体感速度アップ）
     state = list;
+    await _repo.saveAll(list);
   }
 }
 

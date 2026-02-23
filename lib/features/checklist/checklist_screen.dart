@@ -139,10 +139,15 @@ class _ProgressBar extends StatelessWidget {
     return Container(
       height: 3,
       color: AppColors.surfaceVariant,
-      child: FractionallySizedBox(
-        widthFactor: progress,
-        alignment: Alignment.centerLeft,
-        child: Container(color: AppColors.checkboxActive),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: progress),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        builder: (_, value, __) => FractionallySizedBox(
+          widthFactor: value,
+          alignment: Alignment.centerLeft,
+          child: Container(color: AppColors.checkboxActive),
+        ),
       ),
     );
   }
