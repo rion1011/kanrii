@@ -1,29 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../providers/occasion_provider.dart';
 import '../../providers/item_provider.dart';
+import '../../services/firestore_service.dart';
 import 'widgets/item_list_tile.dart';
 import 'widgets/add_item_field.dart';
 
-class OccasionDetailScreen extends ConsumerWidget {
+class OccasionDetailScreen extends ConsumerStatefulWidget {
   const OccasionDetailScreen({super.key, required this.occasionId});
 
   final String occasionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final occasion =
-        ref.watch(occasionProvider.select((list) {
+  ConsumerState<OccasionDetailScreen> createState() =>
+      _OccasionDetailScreenState();
+}
+
+class _OccasionDetailScreenState extends ConsumerState<OccasionDetailScreen> {
+  bool _sharing = false;
+
+  Future<void> _share() async {
+    final occasion = ref.read(occasionProvider.select((list) {
       try {
-        return list.firstWhere((o) => o.id == occasionId);
+        return list.firstWhere((o) => o.id == widget.occasionId);
       } catch (_) {
         return null;
       }
     }));
-    final items = ref.watch(itemsForOccasionProvider(occasionId));
+    final items =
+        ref.read(itemsForOccasionProvider(widget.occasionId));
+
+    if (occasion == null) return;
+
+    setState(() => _sharing = true);
+
+    try {
+      final shareCode = const Uuid().v4().replaceAll('-', '').substring(0, 8);
+      final service = ref.read(firestoreServiceProvider);
+      await service.createSession(shareCode, occasion, items);
+
+      final url =
+          'https://web-five-pi-45.vercel.app/s/$shareCode/${occasion.id}';
+
+      if (!mounted) return;
+
+      await Share.share(
+        '「${occasion.emoji ?? ''}${occasion.name}」の持ち物リストを共有します\n$url',
+        subject: '持ち物リスト共有',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('共有リンクの作成に失敗しました')),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final occasion = ref.watch(occasionProvider.select((list) {
+      try {
+        return list.firstWhere((o) => o.id == widget.occasionId);
+      } catch (_) {
+        return null;
+      }
+    }));
+    final items = ref.watch(itemsForOccasionProvider(widget.occasionId));
 
     if (occasion == null) {
       return Scaffold(
@@ -41,8 +91,24 @@ class OccasionDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: '編集',
-            onPressed: () => context.push('/occasions/$occasionId/edit'),
+            onPressed: () =>
+                context.push('/occasions/${widget.occasionId}/edit'),
           ),
+          if (_sharing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                  child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              tooltip: '共有',
+              onPressed: _share,
+            ),
           TextButton.icon(
             icon: const Icon(
               Icons.play_circle_outline,
@@ -54,7 +120,8 @@ class OccasionDetailScreen extends ConsumerWidget {
             ),
             onPressed: items.isEmpty
                 ? null
-                : () => context.push('/occasions/$occasionId/checklist'),
+                : () =>
+                    context.push('/occasions/${widget.occasionId}/checklist'),
           ),
           const SizedBox(width: 4),
         ],
@@ -73,7 +140,8 @@ class OccasionDetailScreen extends ConsumerWidget {
                         key: Key(item.id),
                         item: item,
                         onDelete: () => ref
-                            .read(itemsForOccasionProvider(occasionId).notifier)
+                            .read(itemsForOccasionProvider(widget.occasionId)
+                                .notifier)
                             .delete(item.id),
                       );
                     },
@@ -81,7 +149,8 @@ class OccasionDetailScreen extends ConsumerWidget {
           ),
           AddItemField(
             onAdd: (name) => ref
-                .read(itemsForOccasionProvider(occasionId).notifier)
+                .read(
+                    itemsForOccasionProvider(widget.occasionId).notifier)
                 .add(name),
           ),
         ],

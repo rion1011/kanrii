@@ -6,6 +6,7 @@ import 'features/home/home_screen.dart';
 import 'features/occasion_form/occasion_form_screen.dart';
 import 'features/occasion_detail/occasion_detail_screen.dart';
 import 'features/checklist/checklist_screen.dart';
+import 'features/shared_session/shared_session_screen.dart';
 
 final _router = GoRouter(
   initialLocation: '/',
@@ -34,6 +35,13 @@ final _router = GoRouter(
       path: '/occasions/:id/checklist',
       builder: (ctx, state) => ChecklistScreen(
         occasionId: state.pathParameters['id']!,
+      ),
+    ),
+    GoRoute(
+      path: '/s/:shareCode/:occasionId',
+      builder: (ctx, state) => SharedSessionScreen(
+        shareCode: state.pathParameters['shareCode']!,
+        occasionId: state.pathParameters['occasionId']!,
       ),
     ),
   ],
